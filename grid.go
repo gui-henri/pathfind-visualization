@@ -16,6 +16,7 @@ const (
 	Frontier
 	Start
 	End
+	Path
 )
 
 const (
@@ -28,6 +29,7 @@ type Cell struct {
 	score          int
 	heuristicScore int
 	parent         *Cell
+	onScreen       bool
 	x              int
 	y              int
 }
@@ -66,7 +68,7 @@ func NewGrid(size int) *Grid {
 func (g *Grid) GetNeighbors(x, y, size int) []*Cell {
 	var neighbors []*Cell
 
-	if x+1 < len(g.Cells) && g.Cells[x+2][y].status != Obstacle && x+1 < size {
+	if x+1 < len(g.Cells) && g.Cells[x+1][y].status != Obstacle && x+1 < size && g.Cells[x+1][y].onScreen {
 		neighbors = append(neighbors, &g.Cells[x+1][y])
 	}
 
@@ -74,11 +76,7 @@ func (g *Grid) GetNeighbors(x, y, size int) []*Cell {
 		neighbors = append(neighbors, &g.Cells[x-1][y])
 	}
 
-	var space int = int(int((screenWidth - 182)) / size)
-
-	ySpace := g.Cells[x][y+2].y*space+50+y*((100-size)/10) < int(sliderRect.Y-10)
-
-	if y+1 < len(g.Cells) && g.Cells[x][y+1].status != Obstacle && ySpace {
+	if y+1 < len(g.Cells) && g.Cells[x][y+1].status != Obstacle && g.Cells[x][y+1].onScreen {
 		neighbors = append(neighbors, &g.Cells[x][y+1])
 	}
 
@@ -90,11 +88,29 @@ func (g *Grid) GetNeighbors(x, y, size int) []*Cell {
 }
 
 func (g *Grid) Reset() {
+	g.StartCell = nil
+	g.EndCell = nil
+	g.FrontierCells = nil
+	g.GridMode = PaintMode
+	g.Ticks = 0
 	for i := range g.Cells {
 		for j := range g.Cells[i] {
 			g.Cells[i][j].status = Unselected
+			g.Cells[i][j].score = 0
+			g.Cells[i][j].heuristicScore = 0
+			g.Cells[i][j].parent = nil
 		}
 	}
+}
+
+func buildPath(cell *Cell) {
+	if cell == nil {
+		return
+	}
+
+	cell.status = Path
+
+	buildPath(cell.parent)
 }
 
 func (g *Grid) paintMode(size int32) {
@@ -199,10 +215,8 @@ func (g *Grid) playMode(size, speed int32) bool {
 		if neighbor.status == End {
 			g.GridMode = PaintMode
 			neighbor.parent = currentCell
+			buildPath(neighbor)
 			return true
-		}
-		if neighbor.status == Obstacle {
-			continue
 		}
 		if neighbor.status == Unselected {
 			newScore := currentCell.score + 1
@@ -220,6 +234,7 @@ func (g *Grid) playMode(size, speed int32) bool {
 		}
 	}
 	if currentCell == g.EndCell {
+		buildPath(currentCell)
 		g.GridMode = PaintMode
 		return true
 	} else {
@@ -272,6 +287,8 @@ func (g *Grid) DrawSubset(size int) {
 				color = rl.DarkGray
 			case Frontier:
 				color = rl.Blue
+			case Path:
+				color = rl.Purple
 			}
 
 			var space int32 = (screenWidth - 182) / int32(size)
@@ -283,8 +300,11 @@ func (g *Grid) DrawSubset(size int) {
 			y := j32*space + 50 + j32*(int32((100-size)/10))
 
 			if space+x > screenWidth-50 || space+y > int32(sliderRect.Y)-10 {
+				g.Cells[i][j].onScreen = false
 				continue
 			}
+
+			g.Cells[i][j].onScreen = true
 
 			rl.DrawRectangle(
 				x,

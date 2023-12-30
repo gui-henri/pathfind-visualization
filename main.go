@@ -22,6 +22,7 @@ const (
 var (
 	gridSubsetSize float32 = 0
 	play           bool    = false
+	speed          int32   = 1
 	sliderRect             = rl.NewRectangle(
 		(float32(screenWidth)/2)-(sliderWidth/2),
 		(float32(screenHeight)/8)*7,
@@ -69,6 +70,12 @@ func main() {
 			100,
 		)
 
+		if rl.IsKeyPressed(rl.KeyLeft) {
+			speed -= 1
+		}
+		if rl.IsKeyPressed(rl.KeyRight) {
+			speed += 1
+		}
 		var icon string
 
 		if play {
@@ -93,7 +100,7 @@ func main() {
 
 		// UPDATE
 
-		finded := grid.UpdateSubset(int32(gridSubsetSize), 60, play)
+		finded := grid.UpdateSubset(int32(gridSubsetSize), speed, play)
 
 		if finded {
 			play = false
@@ -107,6 +114,7 @@ func main() {
 			grid.DrawSubset(int(gridSubsetSize))
 
 			rl.DrawText(strconv.FormatInt(int64(gridSubsetSize), 10), (screenWidth / 2), (screenHeight/9)*8, 20, rl.DarkGray)
+			rl.DrawText("Speed: "+strconv.FormatInt(int64(speed), 10), 500, 10, 20, rl.DarkGray)
 			rl.DrawFPS(10, 10)
 		}
 
