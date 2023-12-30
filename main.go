@@ -8,17 +8,20 @@ import (
 )
 
 const (
-	screenWidth  int32   = 1280
-	screenHeight int32   = 720
-	sliderWidth  float32 = 720
-	sliderHeight float32 = 40
-	padding      float32 = 50
-	SOFT_RED             = 0xfc5f8bff
-	RED                  = 0xff0048ff
+	screenWidth      int32   = 1280
+	screenHeight     int32   = 720
+	playButtonWidth  float32 = 40
+	playButtonHeight float32 = 40
+	sliderWidth      float32 = 720
+	sliderHeight     float32 = 40
+	padding          float32 = 50
+	SOFT_RED                 = 0xfc5f8bff
+	RED                      = 0xff0048ff
 )
 
 var (
 	gridSubsetSize float32 = 0
+	play           bool    = false
 	sliderRect             = rl.NewRectangle(
 		(float32(screenWidth)/2)-(sliderWidth/2),
 		(float32(screenHeight)/8)*7,
@@ -66,9 +69,35 @@ func main() {
 			100,
 		)
 
+		var icon string
+
+		if play {
+			icon = "#133#"
+		} else {
+			icon = "#131#"
+		}
+
+		buttonClick := rg.Button(
+			rl.NewRectangle(
+				(float32(screenWidth))-(playButtonWidth*5),
+				(float32(screenHeight)/8)*7,
+				playButtonWidth,
+				playButtonHeight,
+			),
+			icon,
+		)
+
+		if buttonClick {
+			play = !play
+		}
+
 		// UPDATE
 
-		grid.UpdateSubset(int32(gridSubsetSize))
+		finded := grid.UpdateSubset(int32(gridSubsetSize), 60, play)
+
+		if finded {
+			play = false
+		}
 
 		// DRAW
 		rl.BeginDrawing()
