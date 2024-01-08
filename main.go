@@ -43,6 +43,10 @@ func main() {
 
 	rl.SetTargetFPS(60)
 
+	rl.InitAudioDevice()
+	fx := rl.LoadSound("beep.mp3")
+	rl.SetAudioStreamPitch(fx.Stream, 0.1)
+
 	// GUI STYLING
 
 	rg.SetStyle(rg.DEFAULT, rg.TEXT_SIZE, 20)
@@ -118,7 +122,7 @@ func main() {
 
 		// UPDATE
 
-		finded := grid.UpdateSubset(int32(gridSubsetSize), speed, play, avaliationMethod)
+		finded := grid.UpdateSubset(int32(gridSubsetSize), speed, play, avaliationMethod, fx)
 
 		if finded {
 			play = false
@@ -144,7 +148,6 @@ func main() {
 			}
 			rl.DrawFPS(10, 10)
 		}
-
 		rl.EndDrawing()
 	}
 }

@@ -32,6 +32,8 @@ const (
 	AStar
 )
 
+var bestScore float64 = 9999999
+
 type Cell struct {
 	status         Status
 	score          float64
@@ -230,7 +232,20 @@ func popSmallestScore(cells []*Cell) (*Cell, []*Cell) {
 	return smallest, cells
 }
 
-func (g *Grid) playMode(size, speed int32, m AvaliationMethod) bool {
+func decideVolume(newScore float64, m AvaliationMethod, fx rl.Sound) {
+	if newScore < bestScore {
+		switch m {
+		case BFS:
+			rl.SetAudioStreamPitch(fx.Stream, float32(0.3+(newScore/10)))
+		case DFS:
+			rl.SetAudioStreamPitch(fx.Stream, 5-float32(0.3+(newScore/10)))
+		case AStar:
+			rl.SetAudioStreamPitch(fx.Stream, 5-float32(0.3+(newScore/10)))
+		}
+	}
+}
+
+func (g *Grid) playMode(size, speed int32, m AvaliationMethod, fx rl.Sound) bool {
 	if g.StartCell == nil || g.EndCell == nil {
 		return false
 	}
@@ -263,6 +278,7 @@ func (g *Grid) playMode(size, speed int32, m AvaliationMethod) bool {
 			if newScore < neighbor.score {
 				neighbor.score = newScore
 				neighbor.parent = currentCell
+				decideVolume(newScore, m, fx)
 			}
 			g.GridMode = PaintMode
 			buildPath(neighbor)
@@ -273,6 +289,7 @@ func (g *Grid) playMode(size, speed int32, m AvaliationMethod) bool {
 			if newScore < neighbor.score {
 				neighbor.score = newScore
 				neighbor.parent = currentCell
+				decideVolume(newScore, m, fx)
 			}
 			neighbor.status = Frontier
 			neighbor.parent = currentCell
@@ -283,6 +300,7 @@ func (g *Grid) playMode(size, speed int32, m AvaliationMethod) bool {
 			if newScore < neighbor.score {
 				neighbor.score = newScore
 				neighbor.parent = currentCell
+				decideVolume(newScore, m, fx)
 			}
 		}
 	}
@@ -296,12 +314,11 @@ func (g *Grid) playMode(size, speed int32, m AvaliationMethod) bool {
 			currentCell.status = Visited
 		}
 	}
-
+	rl.PlayAudioStream(fx.Stream)
 	return false
 }
 
-func (g *Grid) UpdateSubset(size, speed int32, play bool, m AvaliationMethod) bool {
-
+func (g *Grid) UpdateSubset(size, speed int32, play bool, m AvaliationMethod, fx rl.Sound) bool {
 	if play && g.GridMode != PlayMode {
 		g.StartCell.score = 0
 		g.StartCell.heuristicScore = 0
@@ -319,7 +336,7 @@ func (g *Grid) UpdateSubset(size, speed int32, play bool, m AvaliationMethod) bo
 	case PaintMode:
 		g.paintMode(size)
 	case PlayMode:
-		return g.playMode(size, speed, avaliationMethod)
+		return g.playMode(size, speed, avaliationMethod, fx)
 	}
 
 	return false
