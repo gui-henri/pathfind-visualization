@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"strconv"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -8,6 +9,7 @@ import (
 
 type Status uint8
 type Mode uint8
+type AvaliationMethod uint8
 
 const (
 	Unselected Status = iota
@@ -24,9 +26,15 @@ const (
 	PlayMode
 )
 
+const (
+	BFS AvaliationMethod = iota
+	DFS
+	AStar
+)
+
 type Cell struct {
 	status         Status
-	score          int
+	score          float64
 	heuristicScore int
 	parent         *Cell
 	onScreen       bool
@@ -58,11 +66,16 @@ func NewGrid(size int) *Grid {
 				status: Unselected,
 				x:      i,
 				y:      j,
+				score:  9999999,
 			}
 		}
 	}
 
 	return &grid
+}
+
+func getEuclidianDistance(s, d *Cell) float64 {
+	return math.Sqrt(math.Pow(float64(s.x-d.x), 2) + math.Pow(float64(s.y-d.y), 2))
 }
 
 func (g *Grid) GetNeighbors(x, y, size int) []*Cell {
@@ -96,7 +109,23 @@ func (g *Grid) Reset() {
 	for i := range g.Cells {
 		for j := range g.Cells[i] {
 			g.Cells[i][j].status = Unselected
-			g.Cells[i][j].score = 0
+			g.Cells[i][j].score = 9999999
+			g.Cells[i][j].heuristicScore = 0
+			g.Cells[i][j].parent = nil
+		}
+	}
+}
+
+func (g *Grid) SoftReset() {
+	g.FrontierCells = nil
+	g.GridMode = PaintMode
+	g.Ticks = 0
+	for i := range g.Cells {
+		for j := range g.Cells[i] {
+			if g.Cells[i][j].status != Obstacle && g.Cells[i][j].status != Start && g.Cells[i][j].status != End {
+				g.Cells[i][j].status = Unselected
+			}
+			g.Cells[i][j].score = 9999999
 			g.Cells[i][j].heuristicScore = 0
 			g.Cells[i][j].parent = nil
 		}
@@ -108,7 +137,9 @@ func buildPath(cell *Cell) {
 		return
 	}
 
-	cell.status = Path
+	if cell.status != Start && cell.status != End {
+		cell.status = Path
+	}
 
 	buildPath(cell.parent)
 }
@@ -171,6 +202,17 @@ func (g *Grid) paintMode(size int32) {
 	}
 }
 
+func (g *Grid) calculateScore(c *Cell, m AvaliationMethod) float64 {
+	switch m {
+	case DFS:
+		return getEuclidianDistance(c, g.EndCell)
+	case AStar:
+		return getEuclidianDistance(c, g.StartCell) + getEuclidianDistance(c, g.EndCell)
+	default:
+		return c.score + 1
+	}
+}
+
 func popSmallestScore(cells []*Cell) (*Cell, []*Cell) {
 	if len(cells) == 0 {
 		return nil, nil
@@ -188,7 +230,7 @@ func popSmallestScore(cells []*Cell) (*Cell, []*Cell) {
 	return smallest, cells
 }
 
-func (g *Grid) playMode(size, speed int32) bool {
+func (g *Grid) playMode(size, speed int32, m AvaliationMethod) bool {
 	if g.StartCell == nil || g.EndCell == nil {
 		return false
 	}
@@ -212,30 +254,42 @@ func (g *Grid) playMode(size, speed int32) bool {
 		if neighbor.status == Start {
 			continue
 		}
+		target := neighbor
+		if BFS == m {
+			target = currentCell
+		}
 		if neighbor.status == End {
+			newScore := g.calculateScore(target, avaliationMethod)
+			if newScore < neighbor.score {
+				neighbor.score = newScore
+				neighbor.parent = currentCell
+			}
 			g.GridMode = PaintMode
-			neighbor.parent = currentCell
 			buildPath(neighbor)
 			return true
 		}
 		if neighbor.status == Unselected {
-			newScore := currentCell.score + 1
-			neighbor.score = newScore
+			newScore := g.calculateScore(target, avaliationMethod)
+			if newScore < neighbor.score {
+				neighbor.score = newScore
+				neighbor.parent = currentCell
+			}
 			neighbor.status = Frontier
 			neighbor.parent = currentCell
 			g.FrontierCells = append(g.FrontierCells, neighbor)
 		}
 		if neighbor.status == Visited {
-			newScore := currentCell.score + 1
+			newScore := g.calculateScore(target, avaliationMethod)
 			if newScore < neighbor.score {
 				neighbor.score = newScore
 				neighbor.parent = currentCell
 			}
 		}
 	}
+
 	if currentCell == g.EndCell {
-		buildPath(currentCell)
 		g.GridMode = PaintMode
+		buildPath(currentCell)
 		return true
 	} else {
 		if currentCell.status != Start {
@@ -246,13 +300,15 @@ func (g *Grid) playMode(size, speed int32) bool {
 	return false
 }
 
-func (g *Grid) UpdateSubset(size, speed int32, play bool) bool {
+func (g *Grid) UpdateSubset(size, speed int32, play bool, m AvaliationMethod) bool {
 
 	if play && g.GridMode != PlayMode {
 		g.StartCell.score = 0
 		g.StartCell.heuristicScore = 0
 		g.FrontierCells = append(g.FrontierCells, g.StartCell)
 		g.GridMode = PlayMode
+	} else if !play && g.GridMode == PlayMode {
+		g.GridMode = PaintMode
 	}
 
 	if !play && g.GridMode == PaintMode {
@@ -263,7 +319,7 @@ func (g *Grid) UpdateSubset(size, speed int32, play bool) bool {
 	case PaintMode:
 		g.paintMode(size)
 	case PlayMode:
-		return g.playMode(size, speed)
+		return g.playMode(size, speed, avaliationMethod)
 	}
 
 	return false
@@ -313,6 +369,12 @@ func (g *Grid) DrawSubset(size int) {
 				space,
 				color,
 			)
+
+			rl.DrawText(strconv.FormatInt(int64(g.Cells[i][j].score), 10), x+5, y+5, 10, rl.Black)
+			if g.Cells[i][j].parent != nil {
+				parent := g.Cells[i][j].parent
+				rl.DrawText(strconv.FormatInt(int64(parent.x), 10)+", "+strconv.FormatInt(int64(parent.y), 10), x+15, y+15, 10, rl.Black)
+			}
 		}
 	}
 	if g.StartCell != nil {

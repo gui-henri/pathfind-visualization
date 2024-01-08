@@ -20,10 +20,11 @@ const (
 )
 
 var (
-	gridSubsetSize float32 = 0
-	play           bool    = false
-	speed          int32   = 1
-	sliderRect             = rl.NewRectangle(
+	gridSubsetSize   float32 = 0
+	play             bool    = false
+	speed            int32   = 1
+	avaliationMethod         = BFS
+	sliderRect               = rl.NewRectangle(
 		(float32(screenWidth)/2)-(sliderWidth/2),
 		(float32(screenHeight)/8)*7,
 		sliderWidth,
@@ -61,6 +62,10 @@ func main() {
 			grid.Reset()
 		}
 
+		if rl.IsKeyPressed(rl.KeyT) {
+			grid.SoftReset()
+		}
+
 		gridSubsetSize = rg.Slider(
 			sliderRect,
 			"2",
@@ -70,12 +75,25 @@ func main() {
 			100,
 		)
 
-		if rl.IsKeyPressed(rl.KeyLeft) {
-			speed -= 1
+		if rl.IsKeyPressed(rl.KeyLeft) && speed > 1 {
+			speed -= 5
 		}
 		if rl.IsKeyPressed(rl.KeyRight) {
-			speed += 1
+			speed += 5
 		}
+
+		if rl.IsKeyPressed(rl.KeyB) {
+			avaliationMethod = BFS
+		}
+
+		if rl.IsKeyPressed(rl.KeyD) {
+			avaliationMethod = DFS
+		}
+
+		if rl.IsKeyPressed(rl.KeyA) {
+			avaliationMethod = AStar
+		}
+
 		var icon string
 
 		if play {
@@ -100,7 +118,7 @@ func main() {
 
 		// UPDATE
 
-		finded := grid.UpdateSubset(int32(gridSubsetSize), speed, play)
+		finded := grid.UpdateSubset(int32(gridSubsetSize), speed, play, avaliationMethod)
 
 		if finded {
 			play = false
@@ -115,6 +133,15 @@ func main() {
 
 			rl.DrawText(strconv.FormatInt(int64(gridSubsetSize), 10), (screenWidth / 2), (screenHeight/9)*8, 20, rl.DarkGray)
 			rl.DrawText("Speed: "+strconv.FormatInt(int64(speed), 10), 500, 10, 20, rl.DarkGray)
+
+			switch avaliationMethod {
+			case BFS:
+				rl.DrawText("Avaliation Method: BFS", 700, 10, 20, rl.DarkGray)
+			case DFS:
+				rl.DrawText("Avaliation Method: DFS", 700, 10, 20, rl.DarkGray)
+			case AStar:
+				rl.DrawText("Avaliation Method: A*", 700, 10, 20, rl.DarkGray)
+			}
 			rl.DrawFPS(10, 10)
 		}
 
