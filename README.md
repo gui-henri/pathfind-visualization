@@ -1,4 +1,4 @@
-## WORK IN PROGRESS
+## WORK IN PROGRESS -- ANY FEEDBACK IS VALID
 
 ### Building for windows:
 
